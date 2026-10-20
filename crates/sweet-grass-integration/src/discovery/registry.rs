@@ -6,7 +6,6 @@
 //! is vendor-agnostic.  Falls back to [`LocalDiscovery`] when the registry
 //! is unreachable.
 
-use serde::{Deserialize, Serialize};
 use sweet_grass_core::config::Capability;
 use sweet_grass_core::primal_names::env_vars;
 

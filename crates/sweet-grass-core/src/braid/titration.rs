@@ -16,7 +16,7 @@
 
 use super::{Braid, types::BRAID_SCHEMA_VERSION};
 use std::sync::atomic::{AtomicU64, Ordering};
-use tracing::{debug, info};
+use tracing::debug;
 
 /// Counters for titration observability.
 ///
@@ -124,7 +124,7 @@ pub fn titrate(braid: &mut Braid) -> TitrationReport {
                 // Default gate inference: primal name → "*Gate"
                 let gate = infer_gate_from_primal(primal);
                 if let Some(g) = gate {
-                    braid.ecop.source_gate = Some(g.clone().into());
+                    braid.ecop.source_gate = Some(g.to_string().into());
                     actions.push(RepairAction::SourceGateInferred {
                         gate: g.to_string(),
                     });
