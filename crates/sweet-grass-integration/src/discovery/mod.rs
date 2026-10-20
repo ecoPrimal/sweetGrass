@@ -29,7 +29,7 @@ use tokio::sync::RwLock;
 
 pub use cached::CachedDiscovery;
 pub use capabilities::extract_capabilities;
-pub use registry::{RegistryDiscovery, RegistryRpc, RegistryRpcClient, ServiceInfo};
+pub use registry::{RegistryDiscovery, RegistryRpc, RegistryRpcClient, ServiceInfo, ServiceInfoExt};
 
 /// Discovery error types.
 #[derive(Debug, Error)]

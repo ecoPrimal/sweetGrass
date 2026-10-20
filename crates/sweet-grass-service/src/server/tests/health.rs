@@ -44,10 +44,10 @@ async fn test_health_check_reports_braid_count() {
     create_test_braid(&server).await;
 
     let status = server.health_check(context::current()).await.unwrap();
-    assert_eq!(status.status, "UP");
-    assert_eq!(status.store_status, "ok");
-    assert_eq!(status.braid_count, 2);
-    assert_eq!(status.version, env!("CARGO_PKG_VERSION"));
+    assert!(status.healthy);
+    assert_eq!(status.details.get("store_status").and_then(|v| v.as_str()), Some("ok"));
+    assert_eq!(status.details.get("braid_count").and_then(|v| v.as_i64()), Some(2));
+    assert_eq!(status.details.get("version").and_then(|v| v.as_str()), Some(env!("CARGO_PKG_VERSION")));
 }
 
 #[tokio::test]

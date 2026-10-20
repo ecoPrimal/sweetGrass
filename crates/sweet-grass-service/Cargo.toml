@@ -17,6 +17,9 @@ categories = ["web-programming", "network-programming"]
 workspace = true
 
 [dependencies]
+# Canonical ecosystem types
+cellmembrane-types = { workspace = true }
+
 # Internal crates
 sweet-grass-core = { path = "../sweet-grass-core" }
 sweet-grass-store = { path = "../sweet-grass-store" }

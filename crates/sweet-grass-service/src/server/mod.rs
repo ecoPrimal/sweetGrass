@@ -601,12 +601,11 @@ impl SweetGrassRpc for SweetGrassServer {
             .await
             .map_err(|e| RpcError::Store(e.to_string()))?;
 
-        Ok(HealthStatus {
-            status: "UP".to_string(),
-            store_status: "ok".to_string(),
-            braid_count: count,
-            version: env!("CARGO_PKG_VERSION").to_string(),
-        })
+        Ok(HealthStatus::ok()
+            .with_detail("status", "UP")
+            .with_detail("store_status", "ok")
+            .with_detail("braid_count", count)
+            .with_detail("version", env!("CARGO_PKG_VERSION")))
     }
 
     async fn health_liveness(self, _ctx: Context) -> bool {

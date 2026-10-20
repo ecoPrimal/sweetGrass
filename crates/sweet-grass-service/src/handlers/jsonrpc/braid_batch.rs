@@ -42,7 +42,7 @@ const fn default_batch_concurrency() -> usize {
 
 const MAX_BATCH_SIZE: usize = 5_000;
 
-const JSONRPC_INVALID_PARAMS: i64 = -32_602;
+const JSONRPC_INVALID_PARAMS: i32 = -32_602;
 
 /// Batch-create multiple braids in a single request.
 ///

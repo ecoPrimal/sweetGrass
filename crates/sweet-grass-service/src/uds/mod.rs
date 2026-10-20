@@ -552,7 +552,7 @@ async fn handle_uds_connection_raw(
 async fn write_jsonrpc_error(
     stream: &mut (impl tokio::io::AsyncWrite + Unpin),
     id: serde_json::Value,
-    code: i64,
+    code: i32,
     message: impl Into<String>,
 ) -> std::io::Result<()> {
     use tokio::io::AsyncWriteExt;

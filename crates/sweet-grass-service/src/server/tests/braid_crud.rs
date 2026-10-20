@@ -9,8 +9,8 @@ use sweet_grass_core::Timestamp;
 async fn test_health_check() {
     let server = make_server();
     let status = server.health_check(context::current()).await.unwrap();
-    assert_eq!(status.status, "UP");
-    assert_eq!(status.braid_count, 0);
+    assert!(status.healthy);
+    assert_eq!(status.details.get("braid_count").and_then(|v| v.as_i64()), Some(0));
 }
 
 #[tokio::test]
@@ -273,7 +273,7 @@ async fn test_server_with_max_concurrent_requests() {
         .with_max_concurrent_requests(42);
 
     let status = server.health_check(context::current()).await.unwrap();
-    assert_eq!(status.status, "UP");
+    assert!(status.healthy);
 }
 
 #[tokio::test]
@@ -289,14 +289,14 @@ async fn test_server_with_explicit_max_concurrent_requests() {
         .with_max_concurrent_requests(99);
 
     let status = server.health_check(context::current()).await.unwrap();
-    assert_eq!(status.status, "UP");
+    assert!(status.healthy);
 }
 
 #[tokio::test]
 async fn test_server_default_max_concurrent_requests() {
     let server = make_server();
     let status = server.health_check(context::current()).await.unwrap();
-    assert_eq!(status.status, "UP");
+    assert!(status.healthy);
 }
 
 #[tokio::test]

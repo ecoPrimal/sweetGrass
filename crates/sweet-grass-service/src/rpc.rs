@@ -105,18 +105,11 @@ pub struct AgentContributions {
     pub braids: Vec<BraidId>,
 }
 
-/// Health status.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HealthStatus {
-    /// Overall status.
-    pub status: String,
-    /// Store status.
-    pub store_status: String,
-    /// Number of Braids in store.
-    pub braid_count: usize,
-    /// Service version.
-    pub version: String,
-}
+/// Health status — canonical form from `cellmembrane-types`.
+///
+/// Organism-specific fields (store_status, braid_count, version) are
+/// carried in `details`.
+pub use cellmembrane_types::HealthStatus;
 
 /// Service status.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -389,17 +382,16 @@ mod tests {
 
     #[test]
     fn test_health_status_serialization() {
-        let status = HealthStatus {
-            status: "healthy".to_string(),
-            store_status: "connected".to_string(),
-            braid_count: 42,
-            version: "0.2.0".to_string(),
-        };
+        let status = HealthStatus::ok()
+            .with_detail("status", "healthy")
+            .with_detail("store_status", "connected")
+            .with_detail("braid_count", 42)
+            .with_detail("version", "0.2.0");
 
         let json = serde_json::to_string(&status).expect("should serialize");
         let parsed: HealthStatus = serde_json::from_str(&json).expect("should deserialize");
-        assert_eq!(parsed.status, "healthy");
-        assert_eq!(parsed.braid_count, 42);
+        assert!(parsed.healthy);
+        assert_eq!(parsed.details.get("braid_count").and_then(|v| v.as_i64()), Some(42));
     }
 
     #[test]

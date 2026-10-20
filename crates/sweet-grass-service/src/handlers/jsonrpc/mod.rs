@@ -68,92 +68,45 @@ use registry::{METHODS, find_handler, find_handler_normalized, normalize_method,
 
 /// JSON-RPC 2.0 error codes per specification.
 pub(crate) mod error_code {
-    pub const PARSE_ERROR: i64 = -32700;
-    pub const INVALID_REQUEST: i64 = -32600;
-    pub const METHOD_NOT_FOUND: i64 = -32601;
-    pub const INVALID_PARAMS: i64 = -32602;
-    pub const INTERNAL_ERROR: i64 = -32603;
+    pub const PARSE_ERROR: i32 = -32700;
+    pub const INVALID_REQUEST: i32 = -32600;
+    pub const METHOD_NOT_FOUND: i32 = -32601;
+    pub const INVALID_PARAMS: i32 = -32602;
+    pub const INTERNAL_ERROR: i32 = -32603;
     /// Resource not found (braid, anchor, etc.).
-    pub const NOT_FOUND: i64 = -32004;
+    pub const NOT_FOUND: i32 = -32004;
     /// Caller lacks required capability token (JH-0 method gate).
     /// Issued by `method_gate::MethodGate`; re-exported here for test assertions.
     #[cfg(test)]
-    pub const PERMISSION_DENIED: i64 = -32001;
+    pub const PERMISSION_DENIED: i32 = -32001;
     /// Caller identity could not be established.
     #[cfg(test)]
-    pub const UNAUTHORIZED: i64 = -32000;
+    pub const UNAUTHORIZED: i32 = -32000;
 }
 
-/// JSON-RPC 2.0 request envelope.
-#[derive(Debug, serde::Deserialize)]
-pub struct JsonRpcRequest {
-    /// Protocol version — must be `"2.0"`.
-    pub jsonrpc: String,
-    /// Semantic method name (`{domain}.{operation}`).
-    pub method: String,
-    /// Method parameters (may be omitted).
-    #[serde(default)]
-    pub params: serde_json::Value,
-    /// Caller-supplied request identifier.
-    ///
-    /// Defaults to `Null` when omitted. Notification detection (absent `id`)
-    /// is handled via raw JSON inspection in `process_single` before parsing.
-    #[serde(default)]
-    pub id: serde_json::Value,
-}
+/// JSON-RPC 2.0 types — canonical forms from `cellmembrane-types`.
+pub use cellmembrane_types::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 
-/// JSON-RPC 2.0 response envelope.
-#[derive(Debug, Serialize, serde::Deserialize)]
-pub struct JsonRpcResponse {
-    /// Protocol version — always `"2.0"`.
-    pub jsonrpc: std::borrow::Cow<'static, str>,
-    /// Result on success.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<serde_json::Value>,
-    /// Error on failure.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<JsonRpcError>,
-    /// Echoed request identifier.
-    pub id: serde_json::Value,
-}
-
-/// JSON-RPC 2.0 error object.
-#[derive(Debug, Serialize, serde::Deserialize)]
-pub struct JsonRpcError {
-    /// Numeric error code per JSON-RPC 2.0 specification.
-    pub code: i64,
-    /// Human-readable error message.
-    pub message: String,
-    /// Optional structured error data.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<serde_json::Value>,
-}
-
-/// The JSON-RPC 2.0 version string.
-const JSONRPC_VERSION: std::borrow::Cow<'static, str> = std::borrow::Cow::Borrowed("2.0");
-
-impl JsonRpcResponse {
-    const fn success(id: serde_json::Value, result: serde_json::Value) -> Self {
-        Self {
-            jsonrpc: JSONRPC_VERSION,
-            result: Some(result),
-            error: None,
-            id,
-        }
-    }
-
-    fn error(id: serde_json::Value, code: i64, message: impl Into<String>) -> Self {
-        Self::error_with_data(id, code, message, None)
-    }
-
+/// Extension methods for `JsonRpcResponse` beyond the canonical API.
+pub(crate) trait JsonRpcResponseExt {
+    /// Create an error response with optional structured data.
     fn error_with_data(
         id: serde_json::Value,
-        code: i64,
+        code: i32,
+        message: impl Into<String>,
+        data: Option<serde_json::Value>,
+    ) -> JsonRpcResponse;
+}
+
+impl JsonRpcResponseExt for JsonRpcResponse {
+    fn error_with_data(
+        id: serde_json::Value,
+        code: i32,
         message: impl Into<String>,
         data: Option<serde_json::Value>,
     ) -> Self {
         Self {
-            jsonrpc: JSONRPC_VERSION,
+            jsonrpc: "2.0".into(),
             result: None,
             error: Some(JsonRpcError {
                 code,
@@ -170,13 +123,13 @@ impl JsonRpcResponse {
 /// A JSON-RPC dispatch error with structured code and message.
 #[derive(Debug)]
 pub(crate) struct DispatchError {
-    pub code: i64,
+    pub code: i32,
     pub message: String,
     pub source_detail: Option<String>,
 }
 
-impl From<(i64, String)> for DispatchError {
-    fn from((code, message): (i64, String)) -> Self {
+impl From<(i32, String)> for DispatchError {
+    fn from((code, message): (i32, String)) -> Self {
         Self {
             code,
             message,
@@ -203,10 +156,10 @@ pub(crate) enum DispatchOutcome {
     /// Handler executed and returned a JSON result.
     Success(serde_json::Value),
     /// Protocol violation — the request never reached a handler.
-    ProtocolError { code: i64, message: String },
+    ProtocolError { code: i32, message: String },
     /// Handler ran but returned a domain error.
     ApplicationError {
-        code: i64,
+        code: i32,
         message: String,
         source_detail: Option<String>,
     },
@@ -240,7 +193,7 @@ impl DispatchOutcome {
             } => {
                 let data =
                     source_detail.map(|detail| serde_json::json!({ "source_detail": detail }));
-                JsonRpcResponse::error_with_data(id, code, message, data)
+                <JsonRpcResponse as JsonRpcResponseExt>::error_with_data(id, code, message, data)
             },
         }
     }
@@ -274,18 +227,21 @@ pub(crate) async fn process_single(
         return None;
     }
 
+    let id = parsed.id.unwrap_or(serde_json::Value::Null);
+
     if parsed.jsonrpc != "2.0" {
         return Some(
             DispatchOutcome::ProtocolError {
                 code: error_code::INVALID_REQUEST,
                 message: "Invalid JSON-RPC version, expected \"2.0\"".into(),
             }
-            .into_response(parsed.id),
+            .into_response(id),
         );
     }
 
-    let outcome = dispatch_classified(state, &parsed.method, parsed.params).await;
-    Some(outcome.into_response(parsed.id))
+    let params = parsed.params.unwrap_or(serde_json::Value::Null);
+    let outcome = dispatch_classified(state, &parsed.method, params).await;
+    Some(outcome.into_response(id))
 }
 
 /// `POST /jsonrpc` — JSON-RPC 2.0 dispatcher with batch and notification support.

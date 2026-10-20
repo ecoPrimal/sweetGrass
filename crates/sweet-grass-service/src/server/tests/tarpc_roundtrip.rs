@@ -49,7 +49,7 @@ async fn test_start_tarpc_server_binds_and_accepts() {
         .await
         .expect("tarpc transport")
         .expect("rpc call");
-    assert_eq!(status.status, "UP");
+    assert!(status.healthy);
 
     handle.abort();
 }

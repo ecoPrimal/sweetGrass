@@ -24,6 +24,9 @@ test = []
 workspace = true
 
 [dependencies]
+# Canonical ecosystem types
+cellmembrane-types = { workspace = true }
+
 # Internal crates
 sweet-grass-core = { path = "../sweet-grass-core" }
 sweet-grass-compression = { path = "../sweet-grass-compression" }

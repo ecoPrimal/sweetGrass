@@ -25,6 +25,9 @@ homepage = "https://sporeprint.primals.eco"
 documentation = "https://sporeprint.primals.eco/lab/"
 
 [workspace.dependencies]
+# Canonical ecosystem types (cellMembrane agglutinated forms)
+cellmembrane-types = { path = "../../gardens/cellMembrane/crates/cellmembrane-types" }
+
 # Async runtime — G72: trimmed from "full" to actual usage
 tokio = { version = "1.40", features = ["rt-multi-thread", "net", "io-util", "sync", "time", "signal", "macros"] }
 futures = "0.3"

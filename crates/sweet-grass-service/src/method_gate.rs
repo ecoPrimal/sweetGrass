@@ -167,9 +167,9 @@ pub struct MethodGate {
 /// JSON-RPC error codes for method gate rejections.
 pub mod error_codes {
     /// Caller identity could not be established.
-    pub const UNAUTHORIZED: i64 = -32_000;
+    pub const UNAUTHORIZED: i32 = -32_000;
     /// Caller lacks a valid capability token for the requested method.
-    pub const PERMISSION_DENIED: i64 = -32_001;
+    pub const PERMISSION_DENIED: i32 = -32_001;
 }
 
 impl MethodGate {
@@ -200,7 +200,7 @@ impl MethodGate {
     /// Returns `Err((code, message))` with `PERMISSION_DENIED` when a
     /// protected method is called without a valid capability token and
     /// the gate is in `Enforced` mode.
-    pub fn check(&self, method: &str, caller: &CallerContext) -> Result<(), (i64, String)> {
+    pub fn check(&self, method: &str, caller: &CallerContext) -> Result<(), (i32, String)> {
         let level = classify_method(method);
 
         if level == MethodAccessLevel::Public {

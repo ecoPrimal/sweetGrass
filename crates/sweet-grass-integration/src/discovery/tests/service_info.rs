@@ -6,17 +6,14 @@ use super::*;
 #[tokio::test]
 async fn test_service_info_to_primal() {
     use super::ServiceInfo;
+    use super::ServiceInfoExt;
 
-    let info = ServiceInfo {
-        id: "svc-1".to_string(),
-        name: "test-service".to_string(),
-        version: "1.0.0".to_string(),
-        tarpc_address: Some(crate::testing::TEST_TARPC_URI.to_string()),
-        rest_address: Some(crate::testing::TEST_REST_URL.to_string()),
-        capabilities: vec!["signing".to_string(), "anchoring".to_string()],
-        last_seen: 1_700_000_000,
-        healthy: true,
-    };
+    let info = ServiceInfo::new("svc-1", "test-service")
+        .with_version("1.0.0")
+        .with_endpoint(format!("tarpc:{}", crate::testing::TEST_TARPC_URI))
+        .with_endpoint(format!("rest:{}", crate::testing::TEST_REST_URL))
+        .with_capability("signing")
+        .with_capability("anchoring");
 
     let primal = info.to_primal();
     assert_eq!(primal.instance_id, "svc-1");
@@ -29,17 +26,10 @@ async fn test_service_info_to_primal() {
 #[tokio::test]
 async fn test_service_info_to_primal_empty_capabilities() {
     use super::ServiceInfo;
+    use super::ServiceInfoExt;
 
-    let info = ServiceInfo {
-        id: "empty-svc".to_string(),
-        name: "empty".to_string(),
-        version: "1.0.0".to_string(),
-        tarpc_address: None,
-        rest_address: None,
-        capabilities: vec![],
-        last_seen: 0,
-        healthy: true,
-    };
+    let info = ServiceInfo::new("empty-svc", "empty")
+        .with_version("1.0.0");
 
     let primal = info.to_primal();
     assert_eq!(primal.instance_id, "empty-svc");
@@ -49,17 +39,12 @@ async fn test_service_info_to_primal_empty_capabilities() {
 #[tokio::test]
 async fn test_service_info_to_primal_mixed_capabilities() {
     use super::ServiceInfo;
+    use super::ServiceInfoExt;
 
-    let info = ServiceInfo {
-        id: "mixed-svc".to_string(),
-        name: "mixed".to_string(),
-        version: "1.0.0".to_string(),
-        tarpc_address: None,
-        rest_address: None,
-        capabilities: vec!["signing".to_string(), "unknown_xyz".to_string()],
-        last_seen: 0,
-        healthy: true,
-    };
+    let info = ServiceInfo::new("mixed-svc", "mixed")
+        .with_version("1.0.0")
+        .with_capability("signing")
+        .with_capability("unknown_xyz");
 
     let primal = info.to_primal();
     assert!(primal.offers(&Capability::Signing));
@@ -69,17 +54,12 @@ async fn test_service_info_to_primal_mixed_capabilities() {
 #[tokio::test]
 async fn test_service_info_to_primal_filters_invalid_capability_strings() {
     use super::ServiceInfo;
+    use super::ServiceInfoExt;
 
-    let info = ServiceInfo {
-        id: "filter-svc".to_string(),
-        name: "filter".to_string(),
-        version: "1.0.0".to_string(),
-        tarpc_address: None,
-        rest_address: None,
-        capabilities: vec!["signing".to_string(), String::new()],
-        last_seen: 0,
-        healthy: true,
-    };
+    let mut info = ServiceInfo::new("filter-svc", "filter")
+        .with_version("1.0.0")
+        .with_capability("signing");
+    info.capabilities.push(String::new());
 
     let primal = info.to_primal();
     assert_eq!(primal.capabilities.len(), 1);
@@ -89,17 +69,13 @@ async fn test_service_info_to_primal_filters_invalid_capability_strings() {
 #[tokio::test]
 async fn test_service_info_to_primal_custom_capability() {
     use super::ServiceInfo;
+    use super::ServiceInfoExt;
 
-    let info = ServiceInfo {
-        id: "custom-svc".to_string(),
-        name: "custom".to_string(),
-        version: "1.0.0".to_string(),
-        tarpc_address: None,
-        rest_address: None,
-        capabilities: vec!["custom:my_feature".to_string()],
-        last_seen: 1_700_000_000,
-        healthy: false,
-    };
+    let mut info = ServiceInfo::new("custom-svc", "custom")
+        .with_version("1.0.0")
+        .with_capability("custom:my_feature");
+    info.status = cellmembrane_types::EcosystemServiceStatus::Error;
+    info.metadata.insert("last_seen".into(), "1700000000".into());
 
     let primal = info.to_primal();
     assert!(primal.offers(&Capability::Custom("my_feature".to_string())));

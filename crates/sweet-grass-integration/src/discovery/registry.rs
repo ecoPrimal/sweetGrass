@@ -34,31 +34,37 @@ pub trait RegistryRpc {
     async fn health() -> std::result::Result<bool, RegistryError>;
 }
 
-/// Service information returned by a discovery registry.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ServiceInfo {
-    /// Service ID.
-    pub id: String,
-    /// Service name.
-    pub name: String,
-    /// Service version.
-    pub version: String,
-    /// tarpc address.
-    pub tarpc_address: Option<String>,
-    /// REST address.
-    pub rest_address: Option<String>,
-    /// Capabilities offered.
-    pub capabilities: Vec<String>,
-    /// Last heartbeat time.
-    pub last_seen: u64,
-    /// Whether service is healthy.
-    pub healthy: bool,
+/// Service information — canonical form from `cellmembrane-types`.
+///
+/// Organism-specific fields (tarpc_address, rest_address, last_seen) are
+/// mapped to/from the canonical `endpoints` and `metadata` fields.
+pub use cellmembrane_types::ServiceInfo;
+
+/// Extension trait for converting canonical `ServiceInfo` to sweetGrass's
+/// `DiscoveredPrimal`.
+pub trait ServiceInfoExt {
+    /// Convert to [`DiscoveredPrimal`].
+    fn to_primal(&self) -> DiscoveredPrimal;
 }
 
-impl ServiceInfo {
-    /// Convert to [`DiscoveredPrimal`].
-    #[must_use]
-    pub fn to_primal(&self) -> DiscoveredPrimal {
+impl ServiceInfoExt for ServiceInfo {
+    fn to_primal(&self) -> DiscoveredPrimal {
+        let tarpc_address = self
+            .endpoints
+            .iter()
+            .find(|e| e.starts_with("tarpc:"))
+            .map(|e| e.strip_prefix("tarpc:").unwrap_or(e).to_string());
+        let rest_address = self
+            .endpoints
+            .iter()
+            .find(|e| e.starts_with("rest:") || e.starts_with("http"))
+            .map(|e| e.strip_prefix("rest:").unwrap_or(e).to_string());
+        let last_seen_secs: u64 = self
+            .metadata
+            .get("last_seen")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0);
+
         DiscoveredPrimal {
             instance_id: self.id.clone(),
             name: self.name.clone(),
@@ -67,11 +73,11 @@ impl ServiceInfo {
                 .iter()
                 .filter_map(|c| Capability::from_string(c))
                 .collect(),
-            tarpc_address: self.tarpc_address.clone(),
-            rest_address: self.rest_address.clone(),
+            tarpc_address,
+            rest_address,
             last_seen: std::time::SystemTime::UNIX_EPOCH
-                + std::time::Duration::from_secs(self.last_seen),
-            healthy: self.healthy,
+                + std::time::Duration::from_secs(last_seen_secs),
+            healthy: self.is_healthy(),
         }
     }
 }
@@ -165,7 +171,7 @@ impl PrimalDiscovery for RegistryDiscovery {
             .await
         {
             Ok(Ok(services)) => {
-                let primals: Vec<_> = services.iter().map(ServiceInfo::to_primal).collect();
+                let primals: Vec<_> = services.iter().map(ServiceInfoExt::to_primal).collect();
                 if !primals.is_empty() {
                     return Ok(primals);
                 }
@@ -182,23 +188,27 @@ impl PrimalDiscovery for RegistryDiscovery {
     }
 
     async fn announce(&self, primal: &DiscoveredPrimal) -> Result<(), DiscoveryError> {
-        let info = ServiceInfo {
-            id: primal.instance_id.clone(),
-            name: primal.name.clone(),
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            tarpc_address: primal.tarpc_address.clone(),
-            rest_address: primal.rest_address.clone(),
-            capabilities: primal
-                .capabilities
-                .iter()
-                .map(ToString::to_string)
-                .collect(),
-            last_seen: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-            healthy: primal.healthy,
+        let mut info = ServiceInfo::new(&primal.instance_id, &primal.name)
+            .with_version(env!("CARGO_PKG_VERSION"));
+        if let Some(tarpc) = &primal.tarpc_address {
+            info = info.with_endpoint(format!("tarpc:{tarpc}"));
+        }
+        if let Some(rest) = &primal.rest_address {
+            info = info.with_endpoint(format!("rest:{rest}"));
+        }
+        for cap in &primal.capabilities {
+            info = info.with_capability(cap.to_string());
+        }
+        info.status = if primal.healthy {
+            cellmembrane_types::EcosystemServiceStatus::Running
+        } else {
+            cellmembrane_types::EcosystemServiceStatus::Error
         };
+        let last_seen = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        info.metadata.insert("last_seen".into(), last_seen.to_string());
 
         match self
             .client
