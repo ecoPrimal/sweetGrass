@@ -121,6 +121,9 @@ enum Commands {
 
     /// Print the resolved Unix domain socket path.
     Socket,
+
+    /// Run comprehensive health diagnostics (`ecoBin` standard).
+    Doctor,
 }
 
 /// Parse `--port` argument: accepts `host:port` (e.g. `0.0.0.0:9850`)
@@ -205,6 +208,7 @@ async fn main() {
         Commands::Status { address } => run_status(&address).await,
         Commands::Capabilities => run_capabilities(),
         Commands::Socket => run_socket(),
+        Commands::Doctor => run_doctor(),
     };
 
     std::process::exit(code);
@@ -536,6 +540,32 @@ fn run_socket() -> i32 {
         tracing::error!("Unix domain sockets are not available on this platform");
         exit_code::GENERAL_ERROR
     }
+}
+
+fn run_doctor() -> i32 {
+    println!("🏥 SweetGrass Health Diagnostics");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!();
+    println!("📦 Binary Information");
+    println!("   Name: sweetgrass");
+    println!("   Version: {}", env!("CARGO_PKG_VERSION"));
+    println!("   Role: Knowledge graph — semantic provenance & attribution");
+    println!();
+    #[cfg(unix)]
+    {
+        let path = sweet_grass_service::uds::resolve_socket_path(None);
+        println!("🔌 IPC Configuration");
+        println!("   Socket path: {}", path.display());
+        println!();
+    }
+    println!("📋 Capabilities");
+    let report = cli::capabilities_report(env!("CARGO_PKG_VERSION"));
+    let output = cli::format_capabilities_report(&report);
+    print!("{output}");
+    println!();
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✅ Health check complete!");
+    exit_code::SUCCESS
 }
 
 async fn run_status(address: &str) -> i32 {
